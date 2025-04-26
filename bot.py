@@ -88,17 +88,17 @@ class SelectNumberView(discord.ui.View):
         view = StartView(self.members, specified_count)
         await interaction.response.send_message("人数をセットされたよ！STARTを押してね！", view=view)
 
-@bot.command()
-async def shiimu(ctx):
-    if ctx.author.voice is None or ctx.author.voice.channel is None:
-        await ctx.send("ボイスチャンネルに参加してから使ってね！")
+@bot.tree.command(name="shiimu", description="ボイスチャンネルのメンバーで役割を振り分けるよ！")
+async def shiimu_command(interaction: discord.Interaction):
+    if interaction.user.voice is None or interaction.user.voice.channel is None:
+        await interaction.response.send_message("ボイスチャンネルに参加してから使ってね！", ephemeral=True)
         return
 
-    voice_channel = ctx.author.voice.channel
+    voice_channel = interaction.user.voice.channel
     members = [member for member in voice_channel.members if not member.bot]
 
     view = SelectNumberView(members)
-    await ctx.send("人数を選んでね！", view=view)
+    await interaction.response.send_message("人数を選んでね！", view=view, ephemeral=True)
 
 @bot.tree.command(name="delete", description="チャンネルを選んで監視開始する")
 async def delete_command(interaction: discord.Interaction):
@@ -149,8 +149,6 @@ async def alldelete_command(interaction: discord.Interaction):
 async def on_message(message):
     if message.author.bot:
         return
-
-    await bot.process_commands(message)
 
     if message.channel.id in watch_channels:
         message_records[message.channel.id].append(message)
