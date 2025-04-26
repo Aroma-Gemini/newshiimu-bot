@@ -96,4 +96,4 @@ async def shiimu(ctx):
     await ctx.send("人数を選んでね！", view=view)
 
 import os
-bot.run(os.getenv(\"DISCORD_TOKEN\"))
+bot.run(os.getenv("DISCORD_TOKEN"))
