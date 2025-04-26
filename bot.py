@@ -1,17 +1,8 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import asyncio
 import random
 import os
-
-# 役割と色の設定
-roles = {
-    "デュエリスト": 0xFF0000,
-    "イニシエーター": 0x00FF00,
-    "コントローラー": 0x0000FF,
-    "センチネル": 0xFFFF00,
-    "フレックス": 0x808080
-}
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -20,7 +11,17 @@ intents.guilds = True
 intents.members = True
 intents.messages = True
 
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+guild_ids = []  # スラッシュコマンドを使うサーバーIDをここに入れる (例: [123456789012345678])
+
+roles = {
+    "デュエリスト": 0xFF0000,
+    "イニシエーター": 0x00FF00,
+    "コントローラー": 0x0000FF,
+    "センチネル": 0xFFFF00,
+    "フレックス": 0x808080
+}
 
 watch_channels = set()
 message_records = {}
@@ -87,41 +88,6 @@ class SelectNumberView(discord.ui.View):
         view = StartView(self.members, specified_count)
         await interaction.response.send_message("人数をセットされたよ！STARTを押してね！", view=view)
 
-class ChannelSelectView(discord.ui.View):
-    def __init__(self, channels, mode):
-        super().__init__(timeout=60)
-        options = [discord.SelectOption(label=ch.name, value=str(ch.id)) for ch in channels]
-        self.add_item(ChannelSelect(options, mode))
-
-class ChannelSelect(discord.ui.Select):
-    def __init__(self, options, mode):
-        placeholder = "監視するチャンネルを選んでね！" if mode == "delete" else "一括削除するチャンネルを選んでね！"
-        super().__init__(placeholder=placeholder, options=options, min_values=1, max_values=1)
-        self.mode = mode
-
-    async def callback(self, interaction: discord.Interaction):
-        channel_id = int(self.values[0])
-        channel = interaction.guild.get_channel(channel_id)
-
-        if self.mode == "delete":
-            watch_channels.add(channel_id)
-            message_records[channel_id] = []
-            await interaction.response.send_message(f"<#{channel_id}> を監視するように設定したよ！", ephemeral=True)
-        elif self.mode == "alldelete":
-            now = discord.utils.utcnow().timestamp()
-            deleted_count = 0
-            async for message in channel.history(limit=None):
-                if (now - message.created_at.timestamp()) >= 86400:
-                    try:
-                        await message.delete()
-                        deleted_count += 1
-                    except (discord.Forbidden, discord.NotFound):
-                        pass
-            await interaction.response.send_message(f"{deleted_count}件の24時間超えメッセージを削除したよ！", ephemeral=True)
-
-        self.view.stop()
-        await interaction.message.delete()
-
 @bot.command()
 async def shiimu(ctx):
     if ctx.author.voice is None or ctx.author.voice.channel is None:
@@ -134,15 +100,47 @@ async def shiimu(ctx):
     view = SelectNumberView(members)
     await ctx.send("人数を選んでね！", view=view)
 
-@bot.command()
-async def delete(ctx):
-    view = ChannelSelectView(ctx.guild.text_channels, "delete")
-    await ctx.send("監視するチャンネルを選んでね！", view=view)
+@bot.tree.command(name="delete", description="チャンネルを選んで監視開始する")
+async def delete_command(interaction: discord.Interaction):
+    channels = [discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in interaction.guild.text_channels]
 
-@bot.command()
-async def alldelete(ctx):
-    view = ChannelSelectView(ctx.guild.text_channels, "alldelete")
-    await ctx.send("一括削除するチャンネルを選んでね！", view=view)
+    class ChannelSelect(discord.ui.View):
+        @discord.ui.select(placeholder="監視するチャンネルを選んでね！", options=channels)
+        async def select_callback(self, interaction2: discord.Interaction, select: discord.ui.Select):
+            channel_id = int(select.values[0])
+            watch_channels.add(channel_id)
+            message_records[channel_id] = []
+            await interaction2.response.send_message(f"<#{channel_id}> を監視するように設定したよ！", ephemeral=True)
+            self.stop()
+
+    view = ChannelSelect()
+    await interaction.response.send_message("監視するチャンネルを選んでね！", view=view, ephemeral=True)
+
+@bot.tree.command(name="alldelete", description="チャンネルを選んで24時間超えメッセージを一括削除する")
+async def alldelete_command(interaction: discord.Interaction):
+    channels = [discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in interaction.guild.text_channels]
+
+    class ChannelSelect(discord.ui.View):
+        @discord.ui.select(placeholder="一括削除するチャンネルを選んでね！", options=channels)
+        async def select_callback(self, interaction2: discord.Interaction, select: discord.ui.Select):
+            channel_id = int(select.values[0])
+            channel = interaction.guild.get_channel(channel_id)
+            now = discord.utils.utcnow().timestamp()
+            deleted_count = 0
+
+            async for message in channel.history(limit=None):
+                if (now - message.created_at.timestamp()) >= 86400:
+                    try:
+                        await message.delete()
+                        deleted_count += 1
+                    except (discord.Forbidden, discord.NotFound):
+                        pass
+
+            await interaction2.response.send_message(f"{deleted_count}件の24時間超えメッセージを削除したよ！", ephemeral=True)
+            self.stop()
+
+    view = ChannelSelect()
+    await interaction.response.send_message("一括削除するチャンネルを選んでね！", view=view, ephemeral=True)
 
 @bot.event
 async def on_message(message):
@@ -166,5 +164,14 @@ async def delete_message_later(message):
         await message.delete()
     except (discord.Forbidden, discord.NotFound):
         pass
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user}")
+    try:
+        synced = await bot.tree.sync()
+        print(f"Slash commands synced: {len(synced)} commands")
+    except Exception as e:
+        print(f"Failed to sync slash commands: {e}")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
