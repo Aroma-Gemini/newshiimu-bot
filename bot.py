@@ -131,12 +131,11 @@ async def alldelete_command(interaction: discord.Interaction):
             deleted_count = 0
 
             async for message in channel.history(limit=None):
-                print(f"message: '{message.content}' created at: {message.created_at}")
                 if (now - message.created_at.timestamp()) >= 86400:
                     try:
                         await message.delete()
                         deleted_count += 1
-                        await asyncio.sleep(1)  # 1秒待つことで優しく削除する！
+                        await asyncio.sleep(1)
                     except (discord.Forbidden, discord.NotFound):
                         pass
 
@@ -148,6 +147,9 @@ async def alldelete_command(interaction: discord.Interaction):
 
 @bot.event
 async def on_message(message):
+    if message.author.bot:
+        return
+
     await bot.process_commands(message)
 
     if message.channel.id in watch_channels:
