@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 import asyncio
 import random
 import os
@@ -87,6 +87,42 @@ class SelectNumberView(discord.ui.View):
         view = StartView(self.members, specified_count)
         await interaction.response.send_message("人数をセットされたよ！STARTを押してね！", view=view)
 
+class ChannelSelectView(discord.ui.View):
+    def __init__(self, ctx, mode):
+        super().__init__(timeout=60)
+        self.ctx = ctx
+        self.mode = mode
+        self.options = [discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in ctx.guild.text_channels]
+
+    @discord.ui.select(placeholder="チャンネルを選んでね！", options=None)
+    async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
+        await interaction.response.defer()
+
+        channel_id = int(select.values[0])
+        channel = self.ctx.guild.get_channel(channel_id)
+
+        if self.mode == "delete":
+            watch_channels.add(channel_id)
+            message_records[channel_id] = []
+            await interaction.followup.send(f"<#{channel_id}> を監視するように設定したよ！")
+        elif self.mode == "alldelete":
+            now = discord.utils.utcnow().timestamp()
+            deleted_count = 0
+
+            async for message in channel.history(limit=None):
+                if (now - message.created_at.timestamp()) >= 86400:
+                    try:
+                        await message.delete()
+                        deleted_count += 1
+                    except (discord.Forbidden, discord.NotFound):
+                        pass
+
+            await interaction.followup.send(f"{deleted_count}件の24時間超えメッセージを削除したよ！")
+
+        for child in self.children:
+            child.disabled = True
+        await interaction.message.edit(view=self)
+
 @bot.command()
 async def shiimu(ctx):
     if ctx.author.voice is None or ctx.author.voice.channel is None:
@@ -101,53 +137,13 @@ async def shiimu(ctx):
 
 @bot.command()
 async def delete(ctx):
-    options = [discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in ctx.guild.text_channels]
-
-    class ChannelSelectView(discord.ui.View):
-        def __init__(self):
-            super().__init__(timeout=None)
-
-        @discord.ui.select(placeholder="監視するチャンネルを選んでね！", options=options)
-        async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
-            await interaction.response.defer()
-            channel_id = int(select.values[0])
-            watch_channels.add(channel_id)
-            message_records[channel_id] = []
-            await interaction.followup.send(f"<#{channel_id}> を監視するように設定したよ！")
-
-    await ctx.send("チャンネルを選んでね！", view=ChannelSelectView())
+    view = ChannelSelectView(ctx, "delete")
+    await ctx.send("監視するチャンネルを選んでね！", view=view)
 
 @bot.command()
 async def alldelete(ctx):
-    options = [discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in ctx.guild.text_channels]
-
-    class ChannelSelectView(discord.ui.View):
-        def __init__(self):
-            super().__init__(timeout=None)
-
-        @discord.ui.select(placeholder="一括削除するチャンネルを選んでね！", options=options)
-        async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
-            await interaction.response.defer()
-            channel_id = int(select.values[0])
-            channel = ctx.guild.get_channel(channel_id)
-            now = discord.utils.utcnow().timestamp()
-            deleted_count = 0
-
-            async for message in channel.history(limit=None):
-                if (now - message.created_at.timestamp()) >= 86400:
-                    try:
-                        await message.delete()
-                        deleted_count += 1
-                    except (discord.Forbidden, discord.NotFound):
-                        pass
-
-            await interaction.followup.send(f"{deleted_count}件の24時間超えメッセージを削除したよ！")
-
-            for child in self.children:
-                child.disabled = True
-            await interaction.message.edit(view=self)
-
-    await ctx.send("チャンネルを選んでね！", view=ChannelSelectView())
+    view = ChannelSelectView(ctx, "alldelete")
+    await ctx.send("一括削除するチャンネルを選んでね！", view=view)
 
 @bot.event
 async def on_message(message):
