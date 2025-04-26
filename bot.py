@@ -13,7 +13,7 @@ intents.messages = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-guild_ids = []  # スラッシュコマンドを使うサーバーIDをここに入れる (例: [123456789012345678])
+guild_ids = []
 
 roles = {
     "デュエリスト": 0xFF0000,
@@ -129,6 +129,8 @@ async def alldelete_command(interaction: discord.Interaction):
             deleted_count = 0
 
             async for message in channel.history(limit=None):
+                print(f"message: '{message.content}' created at: {message.created_at}")  # ★ログ出力追加
+
                 if (now - message.created_at.timestamp()) >= 86400:
                     try:
                         await message.delete()
