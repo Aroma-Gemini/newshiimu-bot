@@ -109,10 +109,11 @@ async def delete(ctx):
     class ChannelSelectView(discord.ui.View):
         @discord.ui.select(placeholder="監視するチャンネルを選んでね！", options=options)
         async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
+            await interaction.response.defer()
             channel_id = int(select.values[0])
             watch_channels.add(channel_id)
             message_records[channel_id] = []
-            await interaction.response.send_message(f"<#{channel_id}> を監視するように設定したよ！")
+            await interaction.followup.send(f"<#{channel_id}> を監視するように設定したよ！")
 
     await ctx.send("チャンネルを選んでね！", view=ChannelSelectView())
 
@@ -123,6 +124,7 @@ async def alldelete(ctx):
     class ChannelSelectView(discord.ui.View):
         @discord.ui.select(placeholder="一括削除するチャンネルを選んでね！", options=options)
         async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
+            await interaction.response.defer()
             channel_id = int(select.values[0])
             channel = ctx.guild.get_channel(channel_id)
             now = discord.utils.utcnow().timestamp()
@@ -136,7 +138,7 @@ async def alldelete(ctx):
                     except (discord.Forbidden, discord.NotFound):
                         pass
 
-            await interaction.response.send_message(f"{deleted_count}件の24時間超えメッセージを削除したよ！")
+            await interaction.followup.send(f"{deleted_count}件の24時間超えメッセージを削除したよ！")
 
     await ctx.send("チャンネルを選んでね！", view=ChannelSelectView())
 
@@ -148,18 +150,16 @@ async def on_message(message):
 
     if message.channel.id in watch_channels:
         message_records[message.channel.id].append(message)
-        # もし10件を超えたら、古い順から削除する
         if len(message_records[message.channel.id]) > 10:
             oldest_message = message_records[message.channel.id].pop(0)
             try:
                 asyncio.create_task(oldest_message.delete())
             except (discord.Forbidden, discord.NotFound):
                 pass
-        # 24時間後に削除予約
         asyncio.create_task(delete_message_later(message))
 
 async def delete_message_later(message):
-    await asyncio.sleep(86400)  # 24時間
+    await asyncio.sleep(86400)
     try:
         await message.delete()
     except (discord.Forbidden, discord.NotFound):
