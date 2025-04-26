@@ -107,10 +107,11 @@ async def delete_command(interaction: discord.Interaction):
     class ChannelSelect(discord.ui.View):
         @discord.ui.select(placeholder="監視するチャンネルを選んでね！", options=channels)
         async def select_callback(self, interaction2: discord.Interaction, select: discord.ui.Select):
+            await interaction2.response.defer()
             channel_id = int(select.values[0])
             watch_channels.add(channel_id)
             message_records[channel_id] = []
-            await interaction2.response.send_message(f"<#{channel_id}> を監視するように設定したよ！", ephemeral=True)
+            await interaction2.followup.send(f"<#{channel_id}> を監視するように設定したよ！", ephemeral=True)
             self.stop()
 
     view = ChannelSelect()
@@ -123,14 +124,14 @@ async def alldelete_command(interaction: discord.Interaction):
     class ChannelSelect(discord.ui.View):
         @discord.ui.select(placeholder="一括削除するチャンネルを選んでね！", options=channels)
         async def select_callback(self, interaction2: discord.Interaction, select: discord.ui.Select):
+            await interaction2.response.defer()
             channel_id = int(select.values[0])
             channel = interaction.guild.get_channel(channel_id)
             now = discord.utils.utcnow().timestamp()
             deleted_count = 0
 
             async for message in channel.history(limit=None):
-                print(f"message: '{message.content}' created at: {message.created_at}")  # ★ログ出力追加
-
+                print(f"message: '{message.content}' created at: {message.created_at}")
                 if (now - message.created_at.timestamp()) >= 86400:
                     try:
                         await message.delete()
@@ -138,7 +139,7 @@ async def alldelete_command(interaction: discord.Interaction):
                     except (discord.Forbidden, discord.NotFound):
                         pass
 
-            await interaction2.response.send_message(f"{deleted_count}件の24時間超えメッセージを削除したよ！", ephemeral=True)
+            await interaction2.followup.send(f"{deleted_count}件の24時間超えメッセージを削除したよ！", ephemeral=True)
             self.stop()
 
     view = ChannelSelect()
