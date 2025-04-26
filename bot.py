@@ -87,18 +87,17 @@ class SelectNumberView(discord.ui.View):
         view = StartView(self.members, specified_count)
         await interaction.response.send_message("人数をセットされたよ！STARTを押してね！", view=view)
 
-class ChannelSelectView(discord.ui.View):
+class ChannelSelect(discord.ui.Select):
     def __init__(self, ctx, mode):
-        super().__init__(timeout=60)
+        options = [discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in ctx.guild.text_channels]
+        super().__init__(placeholder="チャンネルを選んでね！", options=options)
         self.ctx = ctx
         self.mode = mode
-        self.options = [discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in ctx.guild.text_channels]
 
-    @discord.ui.select(placeholder="チャンネルを選んでね！", options=None)
-    async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
+    async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
-        channel_id = int(select.values[0])
+        channel_id = int(self.values[0])
         channel = self.ctx.guild.get_channel(channel_id)
 
         if self.mode == "delete":
@@ -119,9 +118,13 @@ class ChannelSelectView(discord.ui.View):
 
             await interaction.followup.send(f"{deleted_count}件の24時間超えメッセージを削除したよ！")
 
-        for child in self.children:
-            child.disabled = True
-        await interaction.message.edit(view=self)
+        self.disabled = True
+        await interaction.message.edit(view=self.view)
+
+class ChannelSelectView(discord.ui.View):
+    def __init__(self, ctx, mode):
+        super().__init__(timeout=60)
+        self.add_item(ChannelSelect(ctx, mode))
 
 @bot.command()
 async def shiimu(ctx):
