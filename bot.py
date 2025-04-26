@@ -87,9 +87,14 @@ class SelectNumberView(discord.ui.View):
         view = StartView(self.members, specified_count)
         await interaction.response.send_message("人数をセットされたよ！STARTを押してね！", view=view)
 
+class ChannelSelectView(discord.ui.View):
+    def __init__(self, channels, mode):
+        super().__init__(timeout=60)
+        options = [discord.SelectOption(label=ch.name, value=str(ch.id)) for ch in channels]
+        self.add_item(ChannelSelect(options, mode))
+
 class ChannelSelect(discord.ui.Select):
-    def __init__(self, mode, guild):
-        options = [discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in guild.text_channels]
+    def __init__(self, options, mode):
         placeholder = "監視するチャンネルを選んでね！" if mode == "delete" else "一括削除するチャンネルを選んでね！"
         super().__init__(placeholder=placeholder, options=options, min_values=1, max_values=1)
         self.mode = mode
@@ -97,13 +102,13 @@ class ChannelSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         channel_id = int(self.values[0])
         channel = interaction.guild.get_channel(channel_id)
-        now = discord.utils.utcnow().timestamp()
 
         if self.mode == "delete":
             watch_channels.add(channel_id)
             message_records[channel_id] = []
             await interaction.response.send_message(f"<#{channel_id}> を監視するように設定したよ！", ephemeral=True)
         elif self.mode == "alldelete":
+            now = discord.utils.utcnow().timestamp()
             deleted_count = 0
             async for message in channel.history(limit=None):
                 if (now - message.created_at.timestamp()) >= 86400:
@@ -115,11 +120,7 @@ class ChannelSelect(discord.ui.Select):
             await interaction.response.send_message(f"{deleted_count}件の24時間超えメッセージを削除したよ！", ephemeral=True)
 
         self.view.stop()
-
-class ChannelSelectView(discord.ui.View):
-    def __init__(self, mode, guild):
-        super().__init__(timeout=30)
-        self.add_item(ChannelSelect(mode, guild))
+        await interaction.message.delete()
 
 @bot.command()
 async def shiimu(ctx):
@@ -135,12 +136,12 @@ async def shiimu(ctx):
 
 @bot.command()
 async def delete(ctx):
-    view = ChannelSelectView("delete", ctx.guild)
+    view = ChannelSelectView(ctx.guild.text_channels, "delete")
     await ctx.send("監視するチャンネルを選んでね！", view=view)
 
 @bot.command()
 async def alldelete(ctx):
-    view = ChannelSelectView("alldelete", ctx.guild)
+    view = ChannelSelectView(ctx.guild.text_channels, "alldelete")
     await ctx.send("一括削除するチャンネルを選んでね！", view=view)
 
 @bot.event
