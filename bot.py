@@ -6,11 +6,11 @@ import os
 
 # 役割と色の設定
 roles = {
-    "デュエリスト": 0xFF0000,    # 赤
-    "イニシエーター": 0x00FF00,  # 緑
-    "コントローラー": 0x0000FF,  # 青
-    "センチネル": 0xFFFF00,     # 黄
-    "フレックス": 0x808080       # グレー
+    "デュエリスト": 0xFF0000,
+    "イニシエーター": 0x00FF00,
+    "コントローラー": 0x0000FF,
+    "センチネル": 0xFFFF00,
+    "フレックス": 0x808080
 }
 
 intents = discord.Intents.default()
@@ -22,7 +22,6 @@ intents.messages = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# 監視中チャンネルリストとメッセージ記録 {channel_id: [message_objects]}
 watch_channels = set()
 message_records = {}
 
@@ -42,7 +41,7 @@ class StartView(discord.ui.View):
 
         if self.specified_count == 1:
             assigned_roles = ["フレックス"]
-        elif self.specified_count in [2,3,4]:
+        elif self.specified_count in [2, 3, 4]:
             assigned_roles = random.sample(list(roles.keys())[:-1], self.specified_count)
         elif self.specified_count == 5:
             assigned_roles = list(roles.keys())
@@ -81,9 +80,7 @@ class SelectNumberView(discord.ui.View):
         placeholder="人数を選んでください",
         min_values=1,
         max_values=1,
-        options=[
-            discord.SelectOption(label=str(i), value=str(i)) for i in range(1, 11)
-        ]
+        options=[discord.SelectOption(label=str(i), value=str(i)) for i in range(1, 11)]
     )
     async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
         specified_count = int(select.values[0])
@@ -107,6 +104,9 @@ async def delete(ctx):
     options = [discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in ctx.guild.text_channels]
 
     class ChannelSelectView(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=None)
+
         @discord.ui.select(placeholder="監視するチャンネルを選んでね！", options=options)
         async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
             await interaction.response.defer()
@@ -122,6 +122,9 @@ async def alldelete(ctx):
     options = [discord.SelectOption(label=channel.name, value=str(channel.id)) for channel in ctx.guild.text_channels]
 
     class ChannelSelectView(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=None)
+
         @discord.ui.select(placeholder="一括削除するチャンネルを選んでね！", options=options)
         async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
             await interaction.response.defer()
@@ -139,6 +142,10 @@ async def alldelete(ctx):
                         pass
 
             await interaction.followup.send(f"{deleted_count}件の24時間超えメッセージを削除したよ！")
+
+            for child in self.children:
+                child.disabled = True
+            await interaction.message.edit(view=self)
 
     await ctx.send("チャンネルを選んでね！", view=ChannelSelectView())
 
