@@ -136,6 +136,7 @@ async def alldelete_command(interaction: discord.Interaction):
                     try:
                         await message.delete()
                         deleted_count += 1
+                        await asyncio.sleep(1)  # 1秒待つことで優しく削除する！
                     except (discord.Forbidden, discord.NotFound):
                         pass
 
