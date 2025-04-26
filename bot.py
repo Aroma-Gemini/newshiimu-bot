@@ -13,8 +13,6 @@ intents.messages = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-guild_ids = []
-
 roles = {
     "デュエリスト": 0xFF0000,
     "イニシエーター": 0x00FF00,
