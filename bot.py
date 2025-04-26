@@ -148,8 +148,6 @@ async def alldelete_command(interaction: discord.Interaction):
 @bot.event
 async def on_message(message):
     await bot.process_commands(message)
-    if message.author.bot:
-        return
 
     if message.channel.id in watch_channels:
         message_records[message.channel.id].append(message)
